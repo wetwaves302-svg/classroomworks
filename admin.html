@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電機二乙｜教師即時後台</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root{--primary:#315f8f;--primary2:#4d84b8;--bg:#eef3f8;--card:#fff;--text:#203247;--muted:#65758a;--border:#d8e1eb;--green:#16835a;--red:#c44343;--amber:#a96809;--radius:15px;}
+*{box-sizing:border-box} body{margin:0;font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;background:var(--bg);color:var(--text)}
+header{background:linear-gradient(135deg,#23496f,#4d84b8);color:#fff;padding:24px 16px;text-align:center}
+header h1{margin:0;font-size:1.45rem;letter-spacing:2px} header p{margin:8px 0 0;opacity:.9}
+.container{max-width:1180px;margin:auto;padding:16px}
+.card{background:var(--card);border-radius:var(--radius);padding:18px;margin-top:16px;box-shadow:0 2px 8px rgba(25,50,75,.08)}
+h2{font-size:1.1rem;margin:0 0 12px;color:var(--primary);border-left:5px solid var(--primary2);padding-left:10px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{border:none;border-radius:10px;padding:10px 16px;font:inherit;font-weight:bold;cursor:pointer}
+.btn{background:var(--primary);color:#fff} .btn:hover{background:#244d78} .btn.secondary{background:#e8f0f8;color:var(--primary)}
+.btn.danger{background:#b63b3b;color:#fff} button:disabled{opacity:.45;cursor:not-allowed}
+.login{text-align:center;padding:34px 20px} .login p{color:var(--muted);line-height:1.7}
+.status{padding:10px 14px;border-radius:10px;background:#e8f0f8;color:var(--primary);font-weight:bold;margin-top:12px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.kpi{background:#f6f9fc;border:1px solid var(--border);border-radius:12px;padding:14px}
+.kpi b{display:block;font-size:1.55rem;color:var(--primary)} .kpi span{font-size:.88rem;color:var(--muted)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px} .tab{background:#dde8f3;color:var(--primary)} .tab.active{background:var(--primary);color:#fff}
+.panel{display:none} .panel.active{display:block}
+.table-wrap{overflow:auto;max-height:520px;border:1px solid var(--border);border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:.88rem;background:#fff}
+th,td{padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;white-space:nowrap}
+th{position:sticky;top:0;background:#eaf1f8;color:#294e73;z-index:1} td.wrap{white-space:normal;min-width:230px}
+.done{color:var(--green);font-weight:bold} .missing{color:var(--red);font-weight:bold}
+.note{font-size:.86rem;color:var(--muted);line-height:1.7} .hidden{display:none!important}
+@media(max-width:700px){.kpis{grid-template-columns:1fr} .container{padding:10px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>電機二乙｜教師即時後台</h1>
+  <p>即時查看三套系統資料，並匯出為 Excel 統計檔</p>
+</header>
+
+<div class="container">
+  <div class="card login" id="loginCard">
+    <h2 style="border:0;padding:0">教師登入</h2>
+    <p>請使用指定的教師 Google 帳號登入。其他帳號即使知道網址，也無法進入後台。</p>
+    <button class="btn" id="loginBtn">使用 Google 帳號登入</button>
+    <div class="status hidden" id="loginMsg"></div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="card">
+      <div class="toolbar">
+        <strong id="teacherInfo"></strong>
+        <button class="btn secondary" id="refreshBtn">重新讀取</button>
+        <button class="btn" id="exportAllBtn">匯出全部 Excel</button>
+        <button class="btn secondary" id="logoutBtn">登出</button>
+      </div>
+      <p class="note">資料會隨 Firebase 即時更新。Excel 會依目前畫面所收到的最新資料產生，不必先進入 Firebase Console 手動下載。</p>
+    </div>
+
+    <div class="card">
+      <h2>即時總覽</h2>
+      <div class="kpis">
+        <div class="kpi"><b id="cadreKpi">0 / 22</b><span>幹部評分已完成</span></div>
+        <div class="kpi"><b id="voteKpi">0 / 22</b><span>幹部票選已完成</span></div>
+        <div class="kpi"><b id="sweepKpi">0 / 22</b><span>掃地志願已完成</span></div>
+      </div>
+      <div class="status" id="lastUpdate">等待 Firebase 資料……</div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-panel="progressPanel">全班完成進度</button>
+      <button class="tab" data-panel="cadrePanel">幹部評分</button>
+      <button class="tab" data-panel="votePanel">幹部票選</button>
+      <button class="tab" data-panel="sweepPanel">掃地志願</button>
+    </div>
+
+    <div class="card panel active" id="progressPanel">
+      <h2>全班完成進度</h2>
+      <div class="toolbar"><button class="btn" onclick="exportProgress()">匯出完成進度 Excel</button></div>
+      <div class="table-wrap" style="margin-top:12px"><table>
+        <thead><tr><th>座號</th><th>姓名</th><th>幹部評分</th><th>幹部票選</th><th>掃地志願</th><th>缺交項目</th></tr></thead>
+        <tbody id="progressBody"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card panel" id="cadrePanel">
+      <h2>幹部評分即時資料</h2>
+      <div class="toolbar">
+        <button class="btn" onclick="exportCadre()">匯出幹部評分 Excel</button>
+      </div>
+      <p class="note">Excel 包含：完成進度、逐筆評分明細、各幹部平均與分數分布。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>座號</th><th>姓名</th><th>狀態</th><th>最後送出</th><th>作答筆數</th></tr></thead>
+        <tbody id="cadreBody"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card panel" id="votePanel">
+      <h2>幹部票選即時資料</h2>
+      <div class="toolbar"><button class="btn" onclick="exportVote()">匯出幹部票選 Excel</button></div>
+      <p class="note">Excel 包含：完成進度、每位學生投票明細、各職位加權得票統計。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>座號</th><th>姓名</th><th>狀態</th><th>最後送出</th><th>完成職位數</th></tr></thead>
+        <tbody id="voteBody"></tbody>
+      </table></div>
+    </div>
+
+    <div class="card panel" id="sweepPanel">
+      <h2>掃地志願即時資料</h2>
+      <div class="toolbar"><button class="btn" onclick="exportSweep()">匯出掃地志願 Excel</button></div>
+      <p class="note">Excel 包含：完成進度、每位學生完整志願序、各工作第一志願人數與平均志願序。</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>座號</th><th>姓名</th><th>狀態</th><th>掃區</th><th>第一志願</th><th>最後送出</th></tr></thead>
+        <tbody id="sweepBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyA4CRJlu9TTeuffLNKTwnafbmCPXhMydsA",
+  authDomain: "class-ee1b.firebaseapp.com",
+  databaseURL: "https://class-ee1b-default-rtdb.firebaseio.com/",
+  projectId: "class-ee1b",
+  storageBucket: "class-ee1b.firebasestorage.app",
+  messagingSenderId: "324024646371",
+  appId: "1:324024646371:web:1a137b9a72fea5233a23d6"
+};
+const ALLOWED_EMAILS = ["wetwaves302@mst.hlis.hlc.edu.tw"];
+
+const CLASSMATES = [{"no": "02", "name": "孔維繁"}, {"no": "03", "name": "王瀚軒"}, {"no": "04", "name": "余品曄"}, {"no": "05", "name": "余郁翔"}, {"no": "06", "name": "李安典"}, {"no": "08", "name": "林建成"}, {"no": "09", "name": "邱羿睿"}, {"no": "10", "name": "邱智星"}, {"no": "11", "name": "范陳主"}, {"no": "12", "name": "張峻豪"}, {"no": "13", "name": "張曜庭"}, {"no": "14", "name": "曹博鈞"}, {"no": "16", "name": "陳奎恩"}, {"no": "17", "name": "陳崇珉"}, {"no": "18", "name": "黃士庭"}, {"no": "19", "name": "楊承祐"}, {"no": "20", "name": "葉星"}, {"no": "21", "name": "廖泓理"}, {"no": "22", "name": "潘兆幸"}, {"no": "23", "name": "蔡輝玄"}, {"no": "24", "name": "鄧黃子杰"}, {"no": "25", "name": "蕭承軒"}];
+const CADRES = [{"no": "03", "name": "王瀚軒", "title": "學藝股長"}, {"no": "04", "name": "余品曄", "title": "班長"}, {"no": "05", "name": "余郁翔", "title": "外服務股長"}, {"no": "09", "name": "邱羿睿", "title": "節能股長"}, {"no": "10", "name": "邱智星", "title": "康樂股長"}, {"no": "13", "name": "張曜庭", "title": "日誌股長"}, {"no": "16", "name": "陳奎恩", "title": "內服務股長"}, {"no": "17", "name": "陳崇珉", "title": "副班長"}, {"no": "18", "name": "黃士庭", "title": "輔導股長"}, {"no": "20", "name": "葉星", "title": "圖書股長"}, {"no": "21", "name": "廖泓理", "title": "環保股長"}, {"no": "22", "name": "潘兆幸", "title": "風紀股長"}, {"no": "23", "name": "蔡輝玄", "title": "資訊股長"}, {"no": "25", "name": "蕭承軒", "title": "總務股長"}];
+const JOBS = [{"id": "j01", "name": "教室掃地（含走廊與回收籃區）"}, {"id": "j02", "name": "教室內外側門窗戶＋飲水機清潔"}, {"id": "j03", "name": "全日黑板與板溝＋水粉筆補充＋教室內外白板清潔"}, {"id": "j04", "name": "講桌桌面與櫃體清潔＋講桌周圍閒置課桌椅＋小工具櫃"}, {"id": "j05", "name": "垃圾清掃＋裝垃圾袋"}, {"id": "j06", "name": "回收籃"}, {"id": "j07", "name": "放學後整理掃具與課桌椅"}];
+const POSITIONS = [{"id": "p01", "title": "班長"}, {"id": "p02", "title": "副班長"}, {"id": "p03", "title": "學藝股長"}, {"id": "p04", "title": "風紀股長"}, {"id": "p05", "title": "總務股長"}, {"id": "p06", "title": "外服務股長"}, {"id": "p07", "title": "內服務股長"}, {"id": "p08", "title": "環保股長"}, {"id": "p09", "title": "資訊股長"}, {"id": "p10", "title": "圖書股長"}, {"id": "p11", "title": "節能股長"}, {"id": "p12", "title": "輔導股長"}, {"id": "p13", "title": "康樂股長"}, {"id": "p14", "title": "日誌股長"}];
+
+const PATHS = {
+  cadre: "cadreScores/2026-06-cadre/votes",
+  vote: "ee2bVotes2/2026-06-vote-ee2b/votes",
+  sweep: "sweepChoices/2026-06-sweep/entries"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth = firebase.auth();
+const db = firebase.database();
+const $ = id => document.getElementById(id);
+const state = {cadre:{}, vote:{}, sweep:{}};
+
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function timeText(ts){return ts ? new Date(ts).toLocaleString("zh-TW",{hour12:false}) : "—";}
+function stamp(){const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+"_"+String(d.getHours()).padStart(2,"0")+String(d.getMinutes()).padStart(2,"0");}
+function student(no){return CLASSMATES.find(s=>s.no===no)||{no,name:""};}
+function jobName(id){return JOBS.find(j=>j.id===id)?.name||id||"";}
+function posTitle(id){return POSITIONS.find(p=>p.id===id)?.title||id;}
+function candidateName(no){const s=student(no);return no ? `${no} ${s.name||""}`.trim() : "";}
+function statusCell(done){return `<span class="${done?'done':'missing'}">${done?'已完成':'未完成'}</span>`;}
+
+$("loginBtn").onclick=()=>auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(e=>showLoginError(e.message));
+$("logoutBtn").onclick=()=>auth.signOut();
+$("refreshBtn").onclick=()=>loadAll(true);
+$("exportAllBtn").onclick=exportAll;
+
+function showLoginError(msg){$("loginMsg").textContent=msg;$("loginMsg").classList.remove("hidden");}
+
+auth.onAuthStateChanged(user=>{
+  if(!user){
+    $("loginCard").classList.remove("hidden");$("app").classList.add("hidden");return;
+  }
+  if(!ALLOWED_EMAILS.includes(user.email)){
+    showLoginError("此帳號沒有教師後台權限："+user.email);
+    auth.signOut();return;
+  }
+  $("teacherInfo").textContent="已登入："+user.email;
+  $("loginCard").classList.add("hidden");$("app").classList.remove("hidden");
+  loadAll(false);
+});
+
+let listenersStarted=false;
+function loadAll(force){
+  if(force && listenersStarted){
+    [PATHS.cadre,PATHS.vote,PATHS.sweep].forEach(p=>db.ref(p).off());
+    listenersStarted=false;
+  }
+  if(listenersStarted) return;
+  listenersStarted=true;
+  db.ref(PATHS.cadre).on("value",s=>{state.cadre=s.val()||{};render();});
+  db.ref(PATHS.vote).on("value",s=>{state.vote=s.val()||{};render();});
+  db.ref(PATHS.sweep).on("value",s=>{state.sweep=s.val()||{};render();});
+}
+
+function render(){
+  const c=CLASSMATES.filter(s=>state.cadre[s.no]?.scores).length;
+  const v=CLASSMATES.filter(s=>state.vote[s.no]?.picks).length;
+  const w=CLASSMATES.filter(s=>state.sweep[s.no]?.zone).length;
+  $("cadreKpi").textContent=`${c} / ${CLASSMATES.length}`;
+  $("voteKpi").textContent=`${v} / ${CLASSMATES.length}`;
+  $("sweepKpi").textContent=`${w} / ${CLASSMATES.length}`;
+  $("lastUpdate").textContent="最後更新："+new Date().toLocaleString("zh-TW",{hour12:false});
+
+  $("progressBody").innerHTML=CLASSMATES.map(s=>{
+    const a=!!state.cadre[s.no]?.scores,b=!!state.vote[s.no]?.picks,d=!!state.sweep[s.no]?.zone;
+    const miss=[!a&&"幹部評分",!b&&"幹部票選",!d&&"掃地志願"].filter(Boolean).join("、")||"無";
+    return `<tr><td>${s.no}</td><td>${esc(s.name)}</td><td>${statusCell(a)}</td><td>${statusCell(b)}</td><td>${statusCell(d)}</td><td>${miss}</td></tr>`;
+  }).join("");
+
+  $("cadreBody").innerHTML=CLASSMATES.map(s=>{
+    const x=state.cadre[s.no],done=!!x?.scores;
+    return `<tr><td>${s.no}</td><td>${esc(s.name)}</td><td>${statusCell(done)}</td><td>${timeText(x?.ts)}</td><td>${done?Object.keys(x.scores).length:0}</td></tr>`;
+  }).join("");
+
+  $("voteBody").innerHTML=CLASSMATES.map(s=>{
+    const x=state.vote[s.no],done=!!x?.picks;
+    return `<tr><td>${s.no}</td><td>${esc(s.name)}</td><td>${statusCell(done)}</td><td>${timeText(x?.ts)}</td><td>${done?Object.keys(x.picks).length:0}</td></tr>`;
+  }).join("");
+
+  $("sweepBody").innerHTML=CLASSMATES.map(s=>{
+    const x=state.sweep[s.no],done=!!x?.zone,first=x?.ranking?.[0];
+    return `<tr><td>${s.no}</td><td>${esc(s.name)}</td><td>${statusCell(done)}</td><td>${x?.zone==='inner'?'內掃':x?.zone==='outer'?'外掃':'—'}</td><td class="wrap">${first?esc(jobName(first)):'—'}</td><td>${timeText(x?.ts)}</td></tr>`;
+  }).join("");
+}
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");$(b.dataset.panel).classList.add("active");
+});
+
+function addSheet(wb,name,rows,widths){
+  const ws=XLSX.utils.json_to_sheet(rows);
+  if(widths) ws["!cols"]=widths.map(w=>({wch:w}));
+  XLSX.utils.book_append_sheet(wb,ws,name);
+}
+function saveBook(wb,name){XLSX.writeFile(wb,`${name}_${stamp()}.xlsx`);}
+
+function progressRows(){
+  return CLASSMATES.map(s=>{
+    const a=!!state.cadre[s.no]?.scores,b=!!state.vote[s.no]?.picks,d=!!state.sweep[s.no]?.zone;
+    return {
+      座號:s.no,姓名:s.name,
+      幹部評分:a?"已完成":"未完成",
+      幹部票選:b?"已完成":"未完成",
+      掃地志願:d?"已完成":"未完成",
+      缺交項目:[!a&&"幹部評分",!b&&"幹部票選",!d&&"掃地志願"].filter(Boolean).join("、")||"無"
+    };
+  });
+}
+
+function cadreSheets(wb){
+  const progress=CLASSMATES.map(s=>{const x=state.cadre[s.no];return {座號:s.no,姓名:s.name,狀態:x?.scores?"已完成":"未完成",最後送出:timeText(x?.ts),作答筆數:x?.scores?Object.keys(x.scores).length:0};});
+  const details=[];
+  CLASSMATES.forEach(s=>{const x=state.cadre[s.no];if(!x?.scores)return;CADRES.forEach(c=>{const d=x.scores[c.no]||{};details.push({填寫者座號:s.no,填寫者姓名:s.name,幹部座號:c.no,幹部姓名:c.name,職稱:c.title,分數:d.score??"",評分原因:d.reason??"",送出時間:timeText(x.ts)});});});
+  const stats=CADRES.map(c=>{
+    const vals=Object.values(state.cadre).map(v=>v?.scores?.[c.no]?.score).filter(v=>Number.isFinite(Number(v))).map(Number);
+    const row={幹部座號:c.no,幹部姓名:c.name,職稱:c.title,有效人數:vals.length,平均分數:vals.length?Number((vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(2)):""};
+    for(let n=-3;n<=5;n++)row[(n>0?"+":"")+n+"分人數"]=vals.filter(v=>v===n).length;
+    return row;
+  });
+  addSheet(wb,"幹部評分_完成進度",progress,[8,12,10,20,10]);
+  addSheet(wb,"幹部評分_逐筆明細",details,[12,14,12,14,14,8,40,20]);
+  addSheet(wb,"幹部評分_統計",stats,[10,14,14,10,12,10,10,10,10,10,10,10,10,10]);
+}
+
+function voteSheets(wb){
+  const progress=CLASSMATES.map(s=>{const x=state.vote[s.no];return {座號:s.no,姓名:s.name,狀態:x?.picks?"已完成":"未完成",最後送出:timeText(x?.ts),完成職位數:x?.picks?Object.keys(x.picks).length:0};});
+  const details=[];
+  CLASSMATES.forEach(s=>{const x=state.vote[s.no];if(!x?.picks)return;POSITIONS.forEach(p=>{const d=x.picks[p.id]||{};details.push({投票者座號:s.no,投票者姓名:s.name,職位:p.title,第一人選:candidateName(d.first),第二人選:candidateName(d.second),送出時間:timeText(x.ts)});});});
+  const stats=[];
+  POSITIONS.forEach(p=>{
+    const score={};
+    CLASSMATES.forEach(s=>score[s.no]={first:0,second:0,total:0});
+    Object.values(state.vote).forEach(v=>{const d=v?.picks?.[p.id];if(!d)return;if(score[d.first]){score[d.first].first++;score[d.first].total+=2;}if(score[d.second]){score[d.second].second++;score[d.second].total+=1;}});
+    Object.entries(score).sort((a,b)=>b[1].total-a[1].total||a[0].localeCompare(b[0])).forEach(([no,x],i)=>stats.push({職位:p.title,排名:i+1,候選人座號:no,候選人姓名:student(no).name,第一人選票:x.first,第二人選票:x.second,加權總分:x.total}));
+  });
+  addSheet(wb,"幹部票選_完成進度",progress,[8,12,10,20,12]);
+  addSheet(wb,"幹部票選_逐筆明細",details,[12,14,14,18,18,20]);
+  addSheet(wb,"幹部票選_統計",stats,[14,8,12,14,12,12,12]);
+}
+
+function sweepSheets(wb){
+  const progress=CLASSMATES.map(s=>{const x=state.sweep[s.no];return {座號:s.no,姓名:s.name,狀態:x?.zone?"已完成":"未完成",掃區:x?.zone==='inner'?"內掃":x?.zone==='outer'?"外掃":"",最後送出:timeText(x?.ts)};});
+  const details=CLASSMATES.map(s=>{const x=state.sweep[s.no]||{};const r=x.ranking||[];const row={座號:s.no,姓名:s.name,狀態:x.zone?"已完成":"未完成",掃區:x.zone==='inner'?"內掃":x.zone==='outer'?"外掃":"",最後送出:timeText(x.ts)};JOBS.forEach((j,i)=>row[`第${i+1}志願`]=r[i]?jobName(r[i]):"");return row;});
+  const stats=JOBS.map(j=>{
+    const ranks=[];
+    Object.values(state.sweep).forEach(e=>{if(e?.zone!=="inner"||!Array.isArray(e.ranking))return;const idx=e.ranking.indexOf(j.id);if(idx>=0)ranks.push(idx+1);});
+    return {工作:j.name,第一志願人數:ranks.filter(x=>x===1).length,填列人數:ranks.length,平均志願序:ranks.length?Number((ranks.reduce((a,b)=>a+b,0)/ranks.length).toFixed(2)):""};
+  });
+  addSheet(wb,"掃地志願_完成進度",progress,[8,12,10,10,20]);
+  addSheet(wb,"掃地志願_完整志願序",details,[8,12,10,10,20,30,30,30,30,30,30,30]);
+  addSheet(wb,"掃地志願_統計",stats,[42,14,12,14]);
+}
+
+function exportProgress(){const wb=XLSX.utils.book_new();addSheet(wb,"全班完成進度",progressRows(),[8,12,12,12,12,28]);saveBook(wb,"全班完成進度");}
+function exportCadre(){const wb=XLSX.utils.book_new();cadreSheets(wb);saveBook(wb,"幹部評分統計");}
+function exportVote(){const wb=XLSX.utils.book_new();voteSheets(wb);saveBook(wb,"幹部票選統計");}
+function exportSweep(){const wb=XLSX.utils.book_new();sweepSheets(wb);saveBook(wb,"掃地志願統計");}
+function exportAll(){const wb=XLSX.utils.book_new();addSheet(wb,"全班完成進度",progressRows(),[8,12,12,12,12,28]);cadreSheets(wb);voteSheets(wb);sweepSheets(wb);saveBook(wb,"電機二乙_三系統即時後台");}
+</script>
+</body>
+</html>
