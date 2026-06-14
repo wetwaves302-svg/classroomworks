@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>電機二乙 幹部票選</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+<style>
+:root{
+  --primary:#5a9e6f;
+  --primary-dark:#3d7a52;
+  --primary-light:#e8f5ed;
+  --primary-grad1:#7bbf8e;
+  --primary-grad2:#4a9063;
+  --bg:#f2faf4;
+  --card:#fff;
+  --text:#1a3326;
+  --muted:#6b7a72;
+  --border:#d4e8da;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:"Microsoft JhengHei","PingFang TC","Noto Sans TC",sans-serif;
+  background:var(--bg);color:var(--text);padding-bottom:80px;font-size:16px;
+}
+
+/* ── Header ── */
+header{
+  background:linear-gradient(135deg,#2d6a48,#5a9e6f);
+  color:#fff;padding:22px 16px 18px;text-align:center;
+}
+header h1{font-size:1.3rem;letter-spacing:2px;line-height:1.4;}
+header p{margin-top:6px;opacity:.92;font-size:.87rem;line-height:1.6;}
+header .notice{
+  margin-top:10px;font-size:.84rem;
+  background:rgba(255,255,255,.18);border-radius:10px;
+  padding:10px 13px;line-height:1.8;text-align:left;
+}
+
+.container{max-width:680px;margin:0 auto;padding:12px 14px;}
+
+/* ── Cards ── */
+.card{
+  background:var(--card);border-radius:var(--radius);
+  box-shadow:0 1px 5px rgba(0,0,0,.07);padding:16px;margin-top:14px;
+}
+.card h2{
+  font-size:1.05rem;margin-bottom:10px;color:var(--primary-dark);
+  border-left:4px solid var(--primary);padding-left:10px;line-height:1.4;
+}
+
+/* ── Banners ── */
+.banner{
+  padding:12px 14px;border-radius:var(--radius);margin-top:14px;
+  font-size:.9rem;line-height:1.6;font-weight:bold;
+}
+.banner.info{background:#dff0e5;color:#2d6a48;}
+.banner.warn{background:#fef3c7;color:#92400e;}
+.banner.closed{background:#fee2e2;color:#991b1b;}
+.banner.notice{background:#fef9c3;color:#78350f;border:1px solid #fde68a;}
+
+/* ── 輸入欄 ── */
+.input-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.input-row input{
+  flex:1;min-width:110px;padding:13px 12px;
+  border:1.5px solid var(--border);border-radius:10px;
+  font-size:1rem;font-family:inherit;color:var(--text);background:#fff;
+}
+.input-row input:focus{outline:none;border-color:var(--primary);}
+
+/* ── 職位卡片 ── */
+.pos-card{
+  border:2px solid var(--border);border-radius:var(--radius);
+  padding:14px;margin-top:12px;transition:all .2s;background:#fff;
+}
+.pos-card.filled{border-color:var(--primary);background:var(--primary-light);}
+
+.pos-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.pos-head .pos-num{
+  background:var(--primary);color:#fff;border-radius:7px;
+  padding:2px 9px;font-size:.82rem;flex-shrink:0;font-weight:bold;
+}
+.pos-head .pos-title{font-size:1.05rem;font-weight:bold;}
+
+.pos-duty{
+  font-size:.84rem;color:#3d5244;
+  background:#edf7f0;border-radius:8px;
+  padding:8px 10px;line-height:1.65;margin-bottom:12px;
+  border-left:3px solid #a8d5b5;
+}
+
+/* ── 下拉選單 ── */
+.select-row{display:flex;flex-direction:column;gap:8px;}
+.select-item{display:flex;flex-direction:column;gap:4px;}
+.select-label{
+  font-size:.82rem;font-weight:bold;
+  display:flex;align-items:center;gap:6px;
+}
+.badge-first{
+  background:linear-gradient(135deg,#f59e0b,#d97706);
+  color:#fff;border-radius:6px;padding:1px 8px;font-size:.75rem;
+}
+.badge-second{
+  background:#6b7a72;color:#fff;
+  border-radius:6px;padding:1px 8px;font-size:.75rem;
+}
+.pos-select{
+  width:100%;padding:11px 12px;
+  border:1.5px solid var(--border);border-radius:10px;
+  font-size:.95rem;font-family:inherit;color:var(--text);
+  background:#fff;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235a9e6f' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;
+  padding-right:36px;cursor:pointer;
+}
+.pos-select:focus{outline:none;border-color:var(--primary);}
+.pos-select.selected{border-color:var(--primary);background-color:#f0faf3;}
+
+/* 完成標示 */
+.pos-done-badge{
+  display:none;margin-top:8px;
+  font-size:.85rem;color:var(--primary-dark);font-weight:bold;
+  background:#d1fae5;border-radius:8px;padding:6px 10px;
+  align-items:center;gap:6px;
+}
+.pos-card.filled .pos-done-badge{display:flex;}
+
+/* ── 進度條 ── */
+.progress-wrap{
+  background:#edf7f0;border-radius:10px;padding:10px 14px;margin-bottom:14px;
+}
+.progress-text{font-size:.88rem;color:var(--primary-dark);font-weight:bold;margin-bottom:6px;}
+.progress-bar-bg{background:#c8e6d0;border-radius:6px;height:10px;overflow:hidden;}
+.progress-bar-fill{
+  background:linear-gradient(90deg,#7bbf8e,#4a9063);
+  height:100%;border-radius:6px;transition:width .3s ease;
+}
+
+/* ── 按鈕 ── */
+.btn{
+  display:block;width:100%;
+  background:linear-gradient(135deg,var(--primary-grad1),var(--primary-grad2));
+  color:#fff;border:none;border-radius:12px;padding:16px;
+  font-size:1.1rem;font-weight:bold;cursor:pointer;
+  letter-spacing:2px;margin-top:14px;touch-action:manipulation;
+  box-shadow:0 3px 10px rgba(90,158,111,.3);
+}
+.btn:active{background:var(--primary-dark);}
+.btn:disabled{background:#9ca3af;cursor:not-allowed;box-shadow:none;}
+.btn.secondary{
+  background:#fff;color:var(--primary);
+  border:2px solid var(--primary);box-shadow:none;
+}
+.btn.secondary:active{background:var(--primary-light);}
+
+/* ── 確認表格 ── */
+#confirmCard{display:none;}
+.confirm-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.88rem;}
+.confirm-table th,.confirm-table td{
+  border:1px solid var(--border);padding:8px 10px;text-align:left;
+}
+.confirm-table th{background:#edf7f0;font-weight:bold;white-space:nowrap;}
+.confirm-table tr.filled-row td{background:#f0faf3;}
+.first-choice{color:#d97706;font-weight:bold;}
+.second-choice{color:var(--muted);}
+
+/* ── 座號格格 ── */
+.seat-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.seat-box{
+  width:46px;height:46px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.88rem;font-weight:bold;
+  border:2.5px solid #c8e6d0;background:#f4fbf6;color:#94a3b8;
+  transition:all .25s cubic-bezier(.34,1.56,.64,1);
+}
+.seat-box.done{
+  background:linear-gradient(135deg,#7bbf8e,#4a9063);
+  border-color:#4a9063;color:#fff;
+  transform:scale(1.08);
+  box-shadow:0 3px 8px rgba(74,144,99,.38);
+}
+.seat-box.invalid{
+  background:#f1f5f1;border-color:#e2e8e2;
+  color:#c8d5c8;font-size:.75rem;opacity:.45;
+}
+.seat-box.me{
+  border-color:#f59e0b;
+  box-shadow:0 0 0 3px #fde68a;
+  transform:scale(1.12);
+}
+.seat-box.done.me{
+  background:linear-gradient(135deg,#7bbf8e,#4a9063);
+  border-color:#f59e0b;
+  box-shadow:0 0 0 3px #fde68a,0 3px 8px rgba(74,144,99,.38);
+  transform:scale(1.14);
+}
+
+/* ── 結果 ── */
+.result-pos-block{margin-top:18px;}
+.result-pos-title{
+  font-size:.95rem;font-weight:bold;color:var(--primary-dark);
+  border-left:4px solid var(--primary);padding-left:8px;margin-bottom:8px;
+}
+.result-bar-item{margin-top:8px;}
+.rb-head{display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:4px;}
+.rb-name{font-weight:bold;}
+.rb-score{color:var(--primary-dark);font-weight:bold;}
+.rb-detail{font-size:.78rem;color:var(--muted);}
+.rb-bg{background:#c8e6d0;border-radius:6px;height:20px;overflow:hidden;}
+.rb-fill{
+  background:linear-gradient(90deg,#7bbf8e,#4a9063);
+  height:100%;border-radius:6px;transition:width .5s ease;
+}
+
+footer{
+  text-align:center;color:var(--muted);font-size:.82rem;
+  margin-top:28px;padding:0 14px;line-height:1.6;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="pageTitle">🌿 電機二乙 幹部票選</h1>
+  <p id="pageSub">115學年度 第1學期 班級幹部選舉</p>
+  <div class="notice">
+    📌 <b>投票注意事項：</b><br>
+    ① 每個職位可選 <b>第一人選</b>（2分）與 <b>第二人選</b>（1分），得分加總決定當選者。<br>
+    ② 第一人選與第二人選<b>不可選同一人</b>。<br>
+    ③ 可以投給自己。<br>
+    ④ 連選得連任，現任幹部亦可被選。<br>
+    ⑤ 老師後台可查閱投票紀錄，請審慎、公正地行使選票。
+  </div>
+</header>
+
+<div class="container">
+
+  <div id="setupWarn" class="banner warn" style="display:none;">
+    ⚠️ Firebase 尚未連線，目前為離線測試模式。
+  </div>
+
+  <div id="phaseBanner" class="banner info"></div>
+
+  <!-- 座號進度 -->
+  <div class="card">
+    <h2>📋 投票進度</h2>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:4px;line-height:1.6;">
+      綠底＝已投票　灰底＝尚未投票　淡色＝無效座號　金框＝你的座號
+    </p>
+    <div class="seat-grid" id="seatGrid"></div>
+  </div>
+
+  <!-- 投票表單 -->
+  <div class="card" id="voteCard" style="display:none;">
+    <h2>🗳️ 幹部票選</h2>
+    <div class="banner notice" style="display:block;margin-top:0;margin-bottom:14px;">
+      請先填入座號與姓名，再為每個職位選出第一人選與第二人選。投票結果<b>匿名統計呈現</b>，但老師後台可查閱個別紀錄。
+    </div>
+    <div class="input-row">
+      <input id="voterSeat" type="text" inputmode="numeric" placeholder="座號（例：07）" maxlength="3">
+      <input id="voterName" type="text" placeholder="姓名" maxlength="10">
+    </div>
+
+    <!-- 填寫進度 -->
+    <div class="progress-wrap">
+      <div class="progress-text" id="progressText">已完成 0 / 14 個職位</div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div id="posList"></div>
+
+    <div style="margin-top:18px;">
+      <button class="btn" id="previewBtn" disabled>預覽投票結果 →</button>
+    </div>
+  </div>
+
+  <!-- 確認畫面 -->
+  <div class="card" id="confirmCard">
+    <h2>✅ 請確認你的投票</h2>
+    <p style="font-size:.9rem;color:var(--muted);margin-bottom:10px;line-height:1.6;">
+      確認無誤後按「確認送出」；若需修改請按「返回修改」。
+    </p>
+    <table class="confirm-table" id="confirmTable"></table>
+    <button class="btn" id="submitBtn" style="margin-top:16px;">✓ 確認送出</button>
+    <button class="btn secondary" id="backBtn" style="margin-top:10px;">← 返回修改</button>
+  </div>
+
+  <!-- 結果 -->
+  <div class="card" id="resultCard" style="display:none;">
+    <h2>📊 即時得票統計</h2>
+    <p style="font-size:.85rem;color:var(--muted);margin-bottom:4px;">
+      第一人選 2 分、第二人選 1 分，依加權總分排列。
+    </p>
+    <p style="font-size:.88rem;color:var(--muted);" id="resultCount"></p>
+    <div id="resultBars"></div>
+  </div>
+
+  <footer>本系統由導師授權使用，投票結果匿名統計公告，老師後台可查閱個別投票紀錄。</footer>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const CONFIG = {
+  className   : "電機二乙",
+  periodLabel : "115學年度 第1學期 班級幹部選舉",
+  periodKey   : "2026-06-vote-ee2b",
+  voteStart   : "2026-06-14T13:00:00+08:00",
+  voteEnd     : "2026-06-17T11:50:00+08:00",
+  totalSeats  : 25,
+  invalidSeats: ["01","07","15","26"],
+
+  // 全班有效同學名單（下拉選單用）
+  classmates: [
+    {no:"02",name:"孔維繁"},
+    {no:"03",name:"王瀚軒"},
+    {no:"04",name:"余品曄"},
+    {no:"05",name:"余郁翔"},
+    {no:"06",name:"李安典"},
+    {no:"08",name:"林建成"},
+    {no:"09",name:"邱羿睿"},
+    {no:"10",name:"邱智星"},
+    {no:"11",name:"范陳主"},
+    {no:"12",name:"張峻豪"},
+    {no:"13",name:"張曜庭"},
+    {no:"14",name:"曹博鈞"},
+    {no:"16",name:"陳奎恩"},
+    {no:"17",name:"陳崇珉"},
+    {no:"18",name:"黃士庭"},
+    {no:"19",name:"楊承祐"},
+    {no:"20",name:"葉星"},
+    {no:"21",name:"廖泓理"},
+    {no:"22",name:"潘兆幸"},
+    {no:"23",name:"蔡輝玄"},
+    {no:"24",name:"鄧黃子杰"},
+    {no:"25",name:"蕭承軒"},
+  ],
+
+  positions: [
+    {id:"p01", title:"班長",
+     duty:"負責上下課喊口令，擔任導師與各處室之間的溝通橋梁，能即時向導師反映班級生活狀況。高二上學期校慶期間，需統籌整合班級活動，帶領同學共同完成各項任務。"},
+    {id:"p02", title:"副班長",
+     duty:"每天早上第一節下課須前往導師辦公室填寫班級聯繫表，記錄當日出席狀況；中午負責更新教室外走廊白板；週三下午全校活動時需領取紙本點名單並完成填寫。班長不在或分身乏術時，給予即時且適切的協助。"},
+    {id:"p03", title:"學藝股長",
+     duty:"定期進行作業抽查，並將作業繳交狀況確實記錄於班級作業白板，協助導師掌握全班學習進度。"},
+    {id:"p04", title:"風紀股長",
+     duty:"負責維持上課與午休期間的班級秩序，適時提醒同學遵守班規與校規，營造安靜、專注的學習環境。"},
+    {id:"p05", title:"總務股長",
+     duty:"負責收取並詳細記錄班級所有庶務費用。班費由導師統一保管，需要支應時請向導師申請，事後務必填寫完整的出納紀錄，確保班費收支透明。"},
+    {id:"p06", title:"外服務股長",
+     duty:"早上督促外掃區同學確實完成環境清掃；下午帶領同學清除外掃區的人工垃圾，並負責填寫打掃同學的出席與表現紀錄單，作為掃地工作的考核依據。"},
+    {id:"p07", title:"內服務股長",
+     duty:"早、下午均須督促同學確實進行教室內部打掃，並填寫打掃同學的出席與表現紀錄單，維持教室整潔。"},
+    {id:"p08", title:"環保股長",
+     duty:"負責隨時掌握教室掃地用具的使用狀況，及時申請補充不足的耗材，並於用具損壞時提出更新申請，確保掃具維持良好堪用狀態。"},
+    {id:"p09", title:"資訊股長",
+     duty:"每日準時收發同學手機，並前往導師辦公室填寫手機繳交狀況紀錄，確保手機管理流程確實執行。"},
+    {id:"p10", title:"圖書股長",
+     duty:"帶領課堂圖書領讀活動，負責公告、收發與傳達圖書館相關作業及資訊，鼓勵同學積極參與閱讀。"},
+    {id:"p11", title:"節能股長",
+     duty:"負責所有室外課期間的關燈、關電扇及前後門關閉事宜；保管班級冷氣卡，並適時進行儲值。冷氣費用由節能股長與總務股長協商後，請總務協助向同學收費。"},
+    {id:"p12", title:"輔導股長",
+     duty:"協助輔導室收發各類資料，並將輔導室相關訊息與活動即時傳達給班上同學，扮演班級與輔導資源之間的聯絡角色。"},
+    {id:"p13", title:"康樂股長",
+     duty:"負責統籌班級體育課相關事宜，協助整合各項運動競賽的參賽人員，確保每位有意願參加的同學都能獲得公平的機會，提升班級凝聚力與運動參與率。"},
+    {id:"p14", title:"日誌股長",
+     duty:"負責每日班級日誌的記錄與整理，確實記載班級重要事項、活動與公告，並妥善保存，作為班級事務的書面依據。"},
+  ],
+
+  firebaseConfig: {
+    apiKey: "AIzaSyA4CRJlu9TTeuffLNKTwnafbmCPXhMydsA",
+    authDomain: "class-ee1b.firebaseapp.com",
+    databaseURL: "https://class-ee1b-default-rtdb.firebaseio.com/",
+    projectId: "class-ee1b",
+    storageBucket: "class-ee1b.firebasestorage.app",
+    messagingSenderId: "324024646371",
+    appId: "1:324024646371:web:1a137b9a72fea5233a23d6"
+  }
+};
+
+/* ── 工具 ── */
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const fmt = d => new Date(d).toLocaleString("zh-TW",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hour12:false});
+const isAdmin = new URLSearchParams(location.search).get("admin")==="1";
+const isMock  = new URLSearchParams(location.search).get("mock")==="1";
+const start = new Date(CONFIG.voteStart), end = new Date(CONFIG.voteEnd);
+
+$("pageTitle").textContent = CONFIG.className + " 幹部票選";
+$("pageSub").textContent   = CONFIG.periodLabel;
+
+/* ── Firebase ── */
+let db = null, configured = false;
+if(!isMock){
+  try{
+    firebase.initializeApp(CONFIG.firebaseConfig);
+    db = firebase.database();
+    configured = true;
+  }catch(e){ console.error(e); }
+}
+if(!configured) $("setupWarn").style.display = "block";
+const votesRef = () => db && db.ref("ee2bVotes2/" + CONFIG.periodKey + "/votes");
+
+/* 測試假資料 */
+let mockVotes = {};
+if(isMock){
+  const mock = (seat,name,picks)=>{ mockVotes[seat]={seat,name,ts:Date.now(),picks}; };
+  mock("02","孔維繁",{p01:{first:"04",second:"17"},p02:{first:"17",second:"13"},p03:{first:"03",second:"12"},p04:{first:"22",second:"19"},p05:{first:"25",second:"14"},p06:{first:"05",second:"09"},p07:{first:"16",second:"21"},p08:{first:"21",second:"06"},p09:{first:"23",second:"10"},p10:{first:"20",second:"03"},p11:{first:"09",second:"25"},p12:{first:"18",second:"02"},p13:{first:"10",second:"08"},p14:{first:"13",second:"11"}});
+  mock("06","李安典",{p01:{first:"17",second:"04"},p02:{first:"04",second:"17"},p03:{first:"12",second:"03"},p04:{first:"19",second:"22"},p05:{first:"14",second:"25"},p06:{first:"09",second:"05"},p07:{first:"08",second:"16"},p08:{first:"06",second:"21"},p09:{first:"10",second:"23"},p10:{first:"03",second:"20"},p11:{first:"25",second:"09"},p12:{first:"02",second:"18"},p13:{first:"08",second:"10"},p14:{first:"11",second:"13"}});
+}
+
+/* ── 階段 ── */
+function phase(){
+  if(isMock) return "during";
+  const now=new Date();
+  if(now<start) return "before";
+  if(now<=end)  return "during";
+  return "after";
+}
+function renderPhase(){
+  const p=phase(),b=$("phaseBanner");
+  if(p==="before"){
+    b.className="banner info";
+    b.textContent="投票尚未開始，將於 "+fmt(start)+" 開放。";
+  }else if(p==="during"){
+    b.className="banner info";
+    b.textContent="投票進行中！截止時間："+fmt(end)+"。每人限投一次，重複送出以最後一次為準。"+(isMock?" 【測試模式】":"");
+    $("voteCard").style.display="block";
+  }else{
+    b.className="banner closed";
+    b.textContent="投票已於 "+fmt(end)+" 截止，以下為得票統計結果。";
+    $("resultCard").style.display="block";
+  }
+  if(isAdmin||isMock) $("resultCard").style.display="block";
+}
+
+/* ── 座號格格 ── */
+let currentSeat="";
+function buildSeatGrid(){
+  const g=$("seatGrid");g.innerHTML="";
+  for(let i=1;i<=CONFIG.totalSeats;i++){
+    const s=String(i).padStart(2,"0");
+    const div=document.createElement("div");
+    div.className="seat-box"+(CONFIG.invalidSeats.includes(s)?" invalid":"");
+    div.id="sg-"+s;div.textContent=s;
+    g.appendChild(div);
+  }
+}
+function updateSeatGrid(votes){
+  for(let i=1;i<=CONFIG.totalSeats;i++){
+    const s=String(i).padStart(2,"0"),el=$("sg-"+s);
+    if(!el||CONFIG.invalidSeats.includes(s)) continue;
+    el.classList.toggle("done",!!votes[s]);
+  }
+  document.querySelectorAll(".seat-box.me").forEach(e=>e.classList.remove("me"));
+  const me=$("sg-"+currentSeat);
+  if(me&&!CONFIG.invalidSeats.includes(currentSeat)) me.classList.add("me");
+}
+buildSeatGrid();
+
+/* ── 選單選項 HTML ── */
+function buildOptions(excludeNo=""){
+  const blank=`<option value="">── 請選擇 ──</option>`;
+  const opts=CONFIG.classmates.map(m=>
+    `<option value="${m.no}" ${m.no===excludeNo?"disabled style='color:#ccc'":""}>
+      ${m.no} ${m.name}</option>`
+  ).join("");
+  return blank+opts;
+}
+
+/* ── 進度更新 ── */
+function updateProgress(){
+  let done=0;
+  CONFIG.positions.forEach(p=>{
+    const f=document.querySelector(`select[data-pos="${p.id}"][data-rank="first"]`);
+    const s=document.querySelector(`select[data-pos="${p.id}"][data-rank="second"]`);
+    if(f&&s&&f.value&&s.value) done++;
+  });
+  const total=CONFIG.positions.length;
+  $("progressText").textContent=`已完成 ${done} / ${total} 個職位`;
+  $("progressFill").style.width=Math.round(done/total*100)+"%";
+  $("previewBtn").disabled=done<total;
+
+  // 卡片邊框
+  CONFIG.positions.forEach(p=>{
+    const card=document.querySelector(`.pos-card[data-pos="${p.id}"]`);
+    const f=document.querySelector(`select[data-pos="${p.id}"][data-rank="first"]`);
+    const s=document.querySelector(`select[data-pos="${p.id}"][data-rank="second"]`);
+    if(card) card.classList.toggle("filled",!!(f&&s&&f.value&&s.value));
+  });
+}
+
+/* ── 建立職位卡片 ── */
+function buildPosList(){
+  $("posList").innerHTML=CONFIG.positions.map((p,i)=>`
+    <div class="pos-card" data-pos="${p.id}">
+      <div class="pos-head">
+        <span class="pos-num">${String(i+1).padStart(2,"0")}</span>
+        <span class="pos-title">${p.title}</span>
+      </div>
+      <div class="pos-duty">${esc(p.duty)}</div>
+      <div class="select-row">
+        <div class="select-item">
+          <div class="select-label">
+            <span class="badge-first">第一人選 ×2分</span>
+          </div>
+          <select class="pos-select" data-pos="${p.id}" data-rank="first">
+            ${buildOptions()}
+          </select>
+        </div>
+        <div class="select-item">
+          <div class="select-label">
+            <span class="badge-second">第二人選 ×1分</span>
+          </div>
+          <select class="pos-select" data-pos="${p.id}" data-rank="second">
+            ${buildOptions()}
+          </select>
+        </div>
+      </div>
+      <div class="pos-done-badge">✓ 已完成選擇</div>
+    </div>`).join("");
+
+  // 選單互動：第一人選換時，第二人選排除同一人
+  document.querySelectorAll('.pos-select[data-rank="first"]').forEach(sel=>{
+    sel.addEventListener("change",()=>{
+      const pos=sel.dataset.pos;
+      const secondSel=document.querySelector(`select[data-pos="${pos}"][data-rank="second"]`);
+      const oldSecond=secondSel.value;
+      secondSel.innerHTML=buildOptions(sel.value);
+      // 若第二人選與第一相同則清空
+      secondSel.value=(oldSecond&&oldSecond!==sel.value)?oldSecond:"";
+      sel.classList.toggle("selected",!!sel.value);
+      secondSel.classList.toggle("selected",!!secondSel.value);
+      updateProgress();
+    });
+  });
+  document.querySelectorAll('.pos-select[data-rank="second"]').forEach(sel=>{
+    sel.addEventListener("change",()=>{
+      sel.classList.toggle("selected",!!sel.value);
+      updateProgress();
+    });
+  });
+}
+
+/* ── 預覽 ── */
+$("previewBtn").addEventListener("click",()=>{
+  const seat=$("voterSeat").value.trim().padStart(2,"0");
+  const name=$("voterName").value.trim();
+  if(!seat||seat==="00"){ alert("請填寫座號。"); return; }
+  if(!name){ alert("請填寫姓名。"); return; }
+  if(CONFIG.invalidSeats.includes(seat)){ alert("此座號為無效座號，請確認。"); return; }
+
+  // 驗證全部填完
+  let allDone=true;
+  CONFIG.positions.forEach(p=>{
+    const f=document.querySelector(`select[data-pos="${p.id}"][data-rank="first"]`);
+    const s=document.querySelector(`select[data-pos="${p.id}"][data-rank="second"]`);
+    if(!f.value||!s.value){ allDone=false; }
+  });
+  if(!allDone){ alert("還有職位尚未完成選擇，請滾動頁面補齊所有職位。"); return; }
+
+  // 建立確認表格
+  const getName=no=>{ const m=CONFIG.classmates.find(x=>x.no===no); return m?no+" "+m.name:no; };
+  let rows="";
+  CONFIG.positions.forEach((p,i)=>{
+    const f=document.querySelector(`select[data-pos="${p.id}"][data-rank="first"]`).value;
+    const s=document.querySelector(`select[data-pos="${p.id}"][data-rank="second"]`).value;
+    rows+=`<tr class="filled-row">
+      <td>${String(i+1).padStart(2,"0")}</td>
+      <td>${p.title}</td>
+      <td class="first-choice">⭐ ${getName(f)}</td>
+      <td class="second-choice">${getName(s)}</td>
+    </tr>`;
+  });
+  $("confirmTable").innerHTML=`
+    <thead><tr><th>#</th><th>職位</th><th>第一人選(×2)</th><th>第二人選(×1)</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+
+  $("voteCard").style.display="none";
+  $("confirmCard").style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+/* ── 返回修改 ── */
+$("backBtn").addEventListener("click",()=>{
+  $("confirmCard").style.display="none";
+  $("voteCard").style.display="block";
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+/* ── 送出 ── */
+$("submitBtn").addEventListener("click",()=>{
+  const seat=$("voterSeat").value.trim().padStart(2,"0");
+  const name=$("voterName").value.trim();
+  currentSeat=seat;
+
+  const picks={};
+  CONFIG.positions.forEach(p=>{
+    const f=document.querySelector(`select[data-pos="${p.id}"][data-rank="first"]`).value;
+    const s=document.querySelector(`select[data-pos="${p.id}"][data-rank="second"]`).value;
+    picks[p.id]={first:f,second:s};
+  });
+  const entry={seat,name,ts:Date.now(),picks};
+
+  if(isMock){
+    mockVotes[seat]=entry;
+    alert("✅【測試模式】送出成功！（不會寫入 Firebase）");
+    $("confirmCard").style.display="none";
+    buildPosList();
+    $("voterSeat").value="";$("voterName").value="";
+    updateProgress();
+    renderResults(mockVotes);
+    updateSeatGrid(mockVotes);
+    return;
+  }
+  if(!configured){ alert("Firebase 未連線，無法送出。"); return; }
+  $("submitBtn").disabled=true;
+  votesRef().child(seat).set(entry)
+    .then(()=>{
+      alert("✅ 投票成功！感謝你行使選票。");
+      $("confirmCard").style.display="none";
+      buildPosList();
+      $("voterSeat").value="";$("voterName").value="";
+      updateProgress();
+      $("submitBtn").disabled=false;
+    })
+    .catch(e=>{ alert("送出失敗："+e.message); $("submitBtn").disabled=false; });
+});
+
+/* ── 結果渲染 ── */
+function renderResults(votes){
+  const list=Object.values(votes||{});
+  $("resultCount").textContent="目前已有 "+list.length+" 位同學完成投票。";
+
+  // 每個職位×每位同學 累計得分
+  const tally={};
+  CONFIG.positions.forEach(p=>{
+    tally[p.id]={};
+    CONFIG.classmates.forEach(m=>{ tally[p.id][m.no]=0; });
+  });
+  list.forEach(v=>{
+    if(!v.picks) return;
+    Object.entries(v.picks).forEach(([pid,choice])=>{
+      if(tally[pid]===undefined) return;
+      if(choice.first  && tally[pid][choice.first]  !==undefined) tally[pid][choice.first]  +=2;
+      if(choice.second && tally[pid][choice.second] !==undefined) tally[pid][choice.second] +=1;
+    });
+  });
+
+  $("resultBars").innerHTML=CONFIG.positions.map(p=>{
+    const scores=Object.entries(tally[p.id])
+      .map(([no,sc])=>({no,sc,name:(CONFIG.classmates.find(x=>x.no===no)||{}).name||no}))
+      .filter(x=>x.sc>0)
+      .sort((a,b)=>b.sc-a.sc);
+    const maxSc=scores.length?scores[0].sc:1;
+    const bars=scores.length
+      ? scores.map(x=>`
+        <div class="result-bar-item">
+          <div class="rb-head">
+            <span class="rb-name">${x.no} ${x.name}</span>
+            <span class="rb-score">${x.sc} 分</span>
+          </div>
+          <div class="rb-bg"><div class="rb-fill" style="width:${Math.round(x.sc/maxSc*100)}%"></div></div>
+        </div>`).join("")
+      : `<p style="font-size:.85rem;color:var(--muted);margin-top:6px;">尚無人投票</p>`;
+    return `<div class="result-pos-block">
+      <div class="result-pos-title">${p.title}</div>
+      ${bars}
+    </div>`;
+  }).join("");
+
+  updateSeatGrid(votes);
+}
+
+/* ── 監聽 ── */
+if(isMock){
+  renderResults(mockVotes);
+  updateSeatGrid(mockVotes);
+}else if(configured){
+  votesRef().on("value",snap=>renderResults(snap.val()||{}));
+}
+
+$("voterSeat").addEventListener("input",()=>{
+  currentSeat=$("voterSeat").value.trim().padStart(2,"0");
+  if(isMock) updateSeatGrid(mockVotes);
+  else if(configured) votesRef().once("value",snap=>updateSeatGrid(snap.val()||{}));
+  else updateSeatGrid({});
+});
+
+renderPhase();
+buildPosList();
+updateProgress();
+
+setInterval(()=>{
+  if(!isMock&&phase()==="after"&&$("resultCard").style.display==="none") location.reload();
+},30000);
+</script>
+</body>
+</html>
