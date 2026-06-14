@@ -79,6 +79,21 @@
   #pdfReport td,#pdfReport th{border:1px solid #e2e8f0; padding:7px 10px;}
   #pdfReport .cmt{font-size:.88rem; padding:6px 9px; background:#f8fafc; border-radius:8px; margin-top:6px;}
   footer{text-align:center; color:var(--muted); font-size:.82rem; margin-top:30px;}
+
+  .identity-row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 6px;}
+  .identity-row input{flex:1;min-width:130px;padding:12px;border:1.5px solid var(--border);border-radius:10px;font:inherit;}
+  .identity-row input:focus{outline:none;border-color:var(--primary);}
+  .privacy-note{font-size:.86rem;color:var(--muted);line-height:1.6;margin-top:6px;}
+  .admin-table-wrap{overflow-x:auto;}
+  .admin-table{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:10px;}
+  .admin-table th,.admin-table td{border:1px solid var(--border);padding:8px 10px;text-align:left;white-space:nowrap;}
+  .admin-table th{background:#eff6ff;}
+  .status-done{color:var(--green);font-weight:bold;}
+  .status-missing{color:var(--red);font-weight:bold;}
+  .detail-panel{margin-top:16px;border:1px solid var(--border);border-radius:12px;padding:14px;background:#f8fafc;display:none;}
+  .detail-panel h3{color:var(--primary-dark);margin-bottom:10px;}
+  .detail-item{background:#fff;border:1px solid var(--border);border-radius:10px;padding:10px;margin-top:8px;}
+  .detail-item .meta{font-weight:bold;margin-bottom:5px;}
 </style>
 </head>
 <body>
@@ -96,6 +111,17 @@
 
   <div id="phaseBanner" class="banner info"></div>
 
+  <!-- 身分確認 -->
+  <div class="card" id="identityCard">
+    <h2>填寫者身分確認</h2>
+    <p style="font-size:.9rem; color:var(--muted);">每位幹部都要給分並寫出原因。請先輸入座號與姓名，系統會核對班級名單。</p>
+    <div class="identity-row">
+      <input id="voterSeat" type="text" inputmode="numeric" maxlength="2" placeholder="座號（例：08）">
+      <input id="voterName" type="text" maxlength="10" placeholder="姓名">
+    </div>
+    <p class="privacy-note">評分內容不會對其他同學公開；教師可於管理畫面查閱個別填寫紀錄與完成狀況。</p>
+  </div>
+
   <!-- 評分依據 -->
   <div class="card" id="rubricCard">
     <h2>評分依據（-3 ～ +5）</h2>
@@ -107,13 +133,26 @@
 
   <!-- 評分表單 -->
   <div class="card" id="voteCard" style="display:none;">
-    <h2>幹部評分（全部必填，匿名提交）</h2>
-    <p style="font-size:.9rem; color:var(--muted);">每位幹部都要給分並寫出原因。提交為匿名，不會記錄你的姓名或座號。</p>
+    <h2>幹部評分（全部必填）</h2>
     <div id="cadreList"></div>
     <div class="submit-bar">
       <button class="btn" id="submitBtn">送出評分</button>
       <p class="progress-note" id="liveCount"></p>
     </div>
+  </div>
+
+
+  <!-- 教師作答進度與個別紀錄 -->
+  <div class="card" id="adminCard" style="display:none;">
+    <h2>教師管理：作答進度與個別紀錄</h2>
+    <p class="progress-note" id="adminSummary" style="text-align:left;"></p>
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead><tr><th>座號</th><th>姓名</th><th>狀態</th><th>最後送出</th><th>操作</th></tr></thead>
+        <tbody id="adminProgressBody"></tbody>
+      </table>
+    </div>
+    <div class="detail-panel" id="studentDetail"></div>
   </div>
 
   <!-- 結果區 -->
@@ -135,7 +174,7 @@
     <div class="result-grid" id="resultGrid"></div>
   </div>
 
-  <footer>本系統評分皆為匿名提交，僅統計分數與意見內容，保障填寫同學隱私。</footer>
+  <footer>評分內容不對其他同學公開；教師可查閱個別填寫紀錄，以確認完成狀況及處理不當內容。</footer>
 </div>
 
 <!-- PDF 隱藏報告 -->
@@ -155,6 +194,30 @@ const CONFIG = {
   periodKey : "2026-06-cadre",            // ★每次評分換新代號
   voteStart : "2026-06-12T16:00:00+08:00",
   voteEnd   : "2026-06-17T11:50:00+08:00",
+  classmates: [
+    {no:"02",name:"孔維繁"},
+    {no:"03",name:"王瀚軒"},
+    {no:"04",name:"余品曄"},
+    {no:"05",name:"余郁翔"},
+    {no:"06",name:"李安典"},
+    {no:"08",name:"林建成"},
+    {no:"09",name:"邱羿睿"},
+    {no:"10",name:"邱智星"},
+    {no:"11",name:"范陳主"},
+    {no:"12",name:"張峻豪"},
+    {no:"13",name:"張曜庭"},
+    {no:"14",name:"曹博鈞"},
+    {no:"16",name:"陳奎恩"},
+    {no:"17",name:"陳崇珉"},
+    {no:"18",name:"黃士庭"},
+    {no:"19",name:"楊承祐"},
+    {no:"20",name:"葉星"},
+    {no:"21",name:"廖泓理"},
+    {no:"22",name:"潘兆幸"},
+    {no:"23",name:"蔡輝玄"},
+    {no:"24",name:"鄧黃子杰"},
+    {no:"25",name:"蕭承軒"}
+  ],
   cadres : [
     {no:"03", name:"王瀚軒", title:"學藝股長"},
     {no:"04", name:"余品曄", title:"班長"},
@@ -172,15 +235,15 @@ const CONFIG = {
     {no:"25", name:"蕭承軒", title:"總務股長"},
   ],
   /* ★★★ 貼上你的 Firebase 設定碼（請見 Firebase設定說明.md） ★★★ */
-  firebaseConfig: {
-  apiKey: "AIzaSyA4CRJlu9TTeuffLNKTwnafbmCPXhMydsA",
-  authDomain: "class-ee1b.firebaseapp.com",
-  databaseURL: "https://class-ee1b-default-rtdb.firebaseio.com/",
-  projectId: "class-ee1b",
-  storageBucket: "class-ee1b.firebasestorage.app",
-  messagingSenderId: "324024646371",
-  appId: "1:324024646371:web:1a137b9a72fea5233a23d6"
-}
+  firebaseConfig : {
+    apiKey: "AIzaSyA4CRJlu9TTeuffLNKTwnafbmCPXhMydsA",
+    authDomain: "class-ee1b.firebaseapp.com",
+    databaseURL: "https://class-ee1b-default-rtdb.firebaseio.com/",
+    projectId: "class-ee1b",
+    storageBucket: "class-ee1b.firebasestorage.app",
+    messagingSenderId: "324024646371",
+    appId: "1:324024646371:web:1a137b9a72fea5233a23d6"
+  }
 };
 
 /* ====== 評分文字依據（-3 ～ +5） ====== */
@@ -235,14 +298,6 @@ if(!configured) $("setupWarn").style.display = "block";
 
 const votesRef = () => db.ref("cadreScores/" + CONFIG.periodKey + "/votes");
 
-/* 匿名 voterId：存在本機，重複送出會覆蓋而非灌票 */
-function voterId(){
-  const key = "cadreVoterId_" + CONFIG.periodKey;
-  let v = localStorage.getItem(key);
-  if(!v){ v = "v" + Date.now().toString(36) + Math.random().toString(36).slice(2,10); localStorage.setItem(key, v); }
-  return v;
-}
-
 /* ====== 階段判斷 ====== */
 function phase(){
   if(now() < start) return "before";
@@ -265,6 +320,9 @@ function renderPhase(){
     b.textContent = "評分已於 " + fmt(end) + " 截止，以下為全班匿名統計結果。";
     $("resultCard").style.display = "block";
     $("rubricCard").style.display = "none";
+  }
+  if(isAdmin){
+    $("adminCard").style.display = "block";
   }
   if(isAdmin && p !== "after"){
     $("resultCard").style.display = "block";   // 老師可加 ?admin=1 先看結果
@@ -308,26 +366,51 @@ function buildForm(){
 function submitVotes(){
   if(!configured){ alert("尚未設定 Firebase，無法送出。"); return; }
   if(phase() !== "during"){ alert("目前不在評分期間內。"); return; }
-  const data = {}; let ok = true;
+
+  const seat = $("voterSeat").value.trim().padStart(2,"0");
+  const name = $("voterName").value.trim();
+  const matched = CONFIG.classmates.find(s=>s.no===seat && s.name===name);
+  if(!matched){
+    alert("座號與姓名不符，請依班級名單重新確認。");
+    $("voterSeat").focus();
+    return;
+  }
+
+  const data = {}; let ok = true, firstIncomplete = null;
   document.querySelectorAll(".cadre-card").forEach(card=>{
     const score = card.dataset.score;
     const reason = card.querySelector(".reason").value.trim();
     const hint = card.querySelector(".req-hint");
     if(score === undefined || reason.length < 2){
-      hint.style.display = "block"; ok = false;
-      if(ok===false && !data._scrolled){ card.scrollIntoView({behavior:"smooth",block:"center"}); data._scrolled=true; }
+      hint.style.display = "block";
+      ok = false;
+      if(!firstIncomplete) firstIncomplete = card;
     }else{
       hint.style.display = "none";
-      data[card.dataset.no] = {score:+score, reason:reason};
+      data[card.dataset.no] = {score:+score, reason};
     }
   });
-  delete data._scrolled;
-  if(!ok){ alert("還有幹部未完成評分或未填原因，請補齊後再送出。"); return; }
+  if(!ok){
+    firstIncomplete?.scrollIntoView({behavior:"smooth",block:"center"});
+    alert("還有幹部未完成評分或未填原因，請補齊後再送出。");
+    return;
+  }
 
   $("submitBtn").disabled = true;
-  votesRef().child(voterId()).set({ts:Date.now(), scores:data})
-    .then(()=>{ alert("送出成功！感謝你的評分（匿名已保護）。"); $("submitBtn").textContent="已送出（可修改後重新送出）"; $("submitBtn").disabled=false; })
-    .catch(e=>{ alert("送出失敗："+e.message); $("submitBtn").disabled=false; });
+  votesRef().child(seat).set({
+    seat,
+    name,
+    ts: Date.now(),
+    scores: data
+  })
+  .then(()=>{
+    localStorage.setItem("cadreSeat_"+CONFIG.periodKey, seat);
+    localStorage.setItem("cadreName_"+CONFIG.periodKey, name);
+    alert("送出成功！教師可查看你的完成狀況；內容不會對其他同學公開。");
+    $("submitBtn").textContent="已送出（可修改後重新送出）";
+    $("submitBtn").disabled=false;
+  })
+  .catch(e=>{ alert("送出失敗："+e.message); $("submitBtn").disabled=false; });
 }
 
 /* ====== 統計與結果 ====== */
@@ -355,7 +438,7 @@ function computeStats(votes){
 function renderResults(votes){
   const {stats, n} = computeStats(votes);
   latestStats = {stats, n};
-  $("resultCount").textContent = "有效評分人數：" + n + " 人（匿名）";
+  $("resultCount").textContent = "有效評分人數：" + n + " 人（學生端僅顯示統計，教師可查看個別紀錄）";
 
   /* 總覽長條圖 */
   const labels = CONFIG.cadres.map(c=>c.no+" "+c.name+"｜"+c.title);
@@ -403,6 +486,55 @@ function renderResults(votes){
 
 function escapeHtml(s){ return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
 
+
+function formatFullTime(ts){
+  return ts ? new Date(ts).toLocaleString("zh-TW",{hour12:false}) : "—";
+}
+
+function renderAdmin(votes){
+  if(!isAdmin) return;
+  const validVotes = votes || {};
+  const completed = CONFIG.classmates.filter(s=>validVotes[s.no]?.scores).length;
+  $("adminSummary").textContent = `已完成 ${completed}／${CONFIG.classmates.length} 人；未完成 ${CONFIG.classmates.length-completed} 人。`;
+
+  $("adminProgressBody").innerHTML = CONFIG.classmates.map(s=>{
+    const v = validVotes[s.no];
+    const done = !!v?.scores;
+    return `<tr>
+      <td>${s.no}</td>
+      <td>${escapeHtml(s.name)}</td>
+      <td class="${done?'status-done':'status-missing'}">${done?'已完成':'未完成'}</td>
+      <td>${done?formatFullTime(v.ts):'—'}</td>
+      <td>${done?`<button class="btn small" onclick="showStudentDetail('${s.no}')">查看作答</button>`:'—'}</td>
+    </tr>`;
+  }).join("");
+
+  window.__latestVotes = validVotes;
+}
+
+function showStudentDetail(seat){
+  const v = window.__latestVotes?.[seat];
+  const stu = CONFIG.classmates.find(s=>s.no===seat);
+  if(!v || !stu) return;
+  const panel = $("studentDetail");
+  panel.style.display = "block";
+  panel.innerHTML = `
+    <h3>${stu.no} ${escapeHtml(stu.name)}｜最後送出：${formatFullTime(v.ts)}</h3>
+    ${CONFIG.cadres.map(c=>{
+      const d = v.scores?.[c.no];
+      if(!d) return `<div class="detail-item"><div class="meta">${c.no} ${c.name}｜${c.title}</div><div>（未作答）</div></div>`;
+      const sc = Number(d.score);
+      return `<div class="detail-item">
+        <div class="meta">${c.no} ${c.name}｜${c.title}｜
+          <span class="${sc>0?'pos':(sc<0?'neg':'zero')}">${sc>0?'+'+sc:sc} 分</span>
+        </div>
+        <div>${escapeHtml(d.reason || "")}</div>
+      </div>`;
+    }).join("")}
+  `;
+  panel.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
 /* ====== PDF 生成（html2canvas → jsPDF，支援中文） ====== */
 async function makePdf(no){
   if(!latestStats){ alert("資料尚未載入。"); return; }
@@ -414,7 +546,7 @@ async function makePdf(no){
 
   $("pdfReport").innerHTML = `
     <h1>${CONFIG.className} 班級幹部服務表現統計證明</h1>
-    <p class="sub">${CONFIG.periodLabel}｜評分期間 ${fmt(start)} ～ ${fmt(end)}｜全班匿名互評</p>
+    <p class="sub">${CONFIG.periodLabel}｜評分期間 ${fmt(start)} ～ ${fmt(end)}｜班級互評統計</p>
     <div class="box"><h3>基本資料</h3>
       <table><tr><th>座號</th><td>${c.no}</td><th>姓名</th><td>${c.name}</td><th>職稱</th><td>${c.title}</td></tr>
       <tr><th>平均得分</th><td><b>${s.avg.toFixed(2)}</b>（量尺 -3～+5）</td><th>評分人數</th><td>${s.scores.length} 人</td><th>建議獎勵</th><td><b>${rw.t}</b></td></tr></table>
@@ -422,7 +554,7 @@ async function makePdf(no){
     <div class="box"><h3>得分分布</h3>
       <table><tr><th style="width:70px;">分數</th><th style="width:80px;">人數</th><th>該分數之評分依據</th></tr>${distRows}</table>
     </div>
-    <div class="box"><h3>同學匿名回饋意見</h3>
+    <div class="box"><h3>同學回饋意見（本報告不顯示填寫者）</h3>
       ${s.reasons.map(x=>`<div class="cmt">【${x.s>0?"+"+x.s:x.s} 分】${escapeHtml(x.r)}</div>`).join("") || "<div class='cmt'>（無）</div>"}
     </div>
     <p style="margin-top:20px;font-size:.85rem;color:#64748b;">本統計由班級幹部評分系統自動產生，產生時間：${new Date().toLocaleString("zh-TW")}。可作為學習歷程之服務表現佐證資料。</p>`;
@@ -449,14 +581,17 @@ function listen(){
   if(!configured) return;
   votesRef().on("value", snap=>{
     const votes = snap.val() || {};
-    const n = Object.keys(votes).length;
+    const n = Object.values(votes).filter(v=>v && v.scores).length;
     $("liveCount").textContent = "目前已有 " + n + " 位同學完成評分。";
+    if(isAdmin) renderAdmin(votes);
     if(phase()==="after" || isAdmin) renderResults(votes);
   });
 }
 
 renderPhase();
 buildForm();
+$("voterSeat").value = localStorage.getItem("cadreSeat_"+CONFIG.periodKey) || "";
+$("voterName").value = localStorage.getItem("cadreName_"+CONFIG.periodKey) || "";
 listen();
 /* 跨越截止時間自動切換 */
 setInterval(()=>{
